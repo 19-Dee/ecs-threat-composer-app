@@ -1,0 +1,34 @@
+{
+    "branches": [
+        {
+            "name": "main"
+        }
+    ],
+    "plugins": [
+        [
+            "@semantic-release/commit-analyzer",
+            {
+                "preset": "angular",
+                "releaseRules": [
+                    {
+                        "message": "*BREAKING CHANGE*",
+                        "release": "minor"
+                    },
+                    {
+                        "type": "feat",
+                        "release": "patch"
+                    },
+                    {
+                        "type": "style",
+                        "release": "patch"
+                    }
+                ]
+            }
+        ],
+        "@semantic-release/release-notes-generator",
+        [
+            "@semantic-release/github",
+            {}
+        ]
+    ]
+}

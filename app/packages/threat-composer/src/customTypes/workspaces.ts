@@ -1,0 +1,32 @@
+/** *******************************************************************************************************************
+  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+
+  Licensed under the Apache License, Version 2.0 (the "License").
+  You may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+ ******************************************************************************************************************** */
+import { z } from 'zod';
+import { MetadataNodeSchema } from './entities';
+import {
+  REGEX_WORKSPACE_NAME,
+  SINGLE_FIELD_INPUT_SMALL_MAX_LENGTH,
+  STORAGE_LOCAL_STATE,
+  STORAGE_LOCAL_STORAGE,
+} from '../configs';
+
+export const WorkspaceSchema = z.object({
+  id: z.string().length(36).describe('UUID v4 identifier for the workspace'),
+  name: z.string().max(SINGLE_FIELD_INPUT_SMALL_MAX_LENGTH).regex(REGEX_WORKSPACE_NAME, `Invalid. Workspace name pattern ${REGEX_WORKSPACE_NAME}`).describe('Human-readable workspace name'),
+  storageType: z.enum([STORAGE_LOCAL_STATE, STORAGE_LOCAL_STORAGE]).optional().describe('Storage mechanism for the workspace'),
+  metadata: MetadataNodeSchema.optional().describe('Additional workspace metadata'),
+});
+
+export type Workspace = z.infer<typeof WorkspaceSchema>;

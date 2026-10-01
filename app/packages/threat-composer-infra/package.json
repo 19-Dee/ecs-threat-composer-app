@@ -1,0 +1,25 @@
+{
+  "name": "@aws/threat-composer-infra",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "aws-cdk-lib": "^2.266.0",
+    "cdk-nag": "^2",
+    "constructs": "^10.8.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
+    "@types/node": "^26",
+    "@typescript-eslint/eslint-plugin": "^8",
+    "@typescript-eslint/parser": "^8",
+    "aws-cdk": "^2.1138.0",
+    "eslint": "^10",
+    "eslint-import-resolver-typescript": "4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "tsx": "4.23.12",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "root": true,
+  "plugins": [
+    "@typescript-eslint",
+    "import-x"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": "./tsconfig.json"
+  },
+  "extends": [
+    "plugin:import-x/typescript",
+    "plugin:prettier/recommended"
+  ],
+  "settings": {
+    "import-x/parsers": {
+      "@typescript-eslint/parser": [
+        ".ts",
+        ".tsx"
+      ]
+    },
+    "import-x/resolver": {
+      "node": {},
+      "typescript": {
+        "project": "./tsconfig.json",
+        "alwaysTryTypes": true
+      }
+    }
+  },
+  "ignorePatterns": [
+    "packages/**/*.*",
+    "node_modules/",
+    "!scripts/**/*.ts"
+  ],
+  "rules": {
+    "@typescript-eslint/no-require-imports": [
+      "error"
+    ],
+    "import-x/no-extraneous-dependencies": [
+      "error",
+      {
+        "devDependencies": [
+          "scripts/**/*.ts"
+        ],
+        "optionalDependencies": false,
+        "peerDependencies": true
+      }
+    ],
+    "import-x/no-unresolved": [
+      "error"
+    ],
+    "import-x/order": [
+      "warn",
+      {
+        "groups": [
+          "builtin",
+          "external"
+        ],
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true
+        }
+      }
+    ],
+    "import-x/no-duplicates": [
+      "error"
+    ],
+    "no-shadow": [
+      "off"
+    ],
+    "@typescript-eslint/no-shadow": [
+      "error"
+    ],
+    "key-spacing": [
+      "error"
+    ],
+    "no-multiple-empty-lines": [
+      "error"
+    ],
+    "@typescript-eslint/no-floating-promises": [
+      "error"
+    ],
+    "no-return-await": [
+      "off"
+    ],
+    "@typescript-eslint/return-await": [
+      "error"
+    ],
+    "no-trailing-spaces": [
+      "error"
+    ],
+    "dot-notation": [
+      "error"
+    ],
+    "no-bitwise": [
+      "error"
+    ]
+  }
+}
