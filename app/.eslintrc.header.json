@@ -1,6 +1,0 @@
-{
-  "plugins": ["@tony.ganchev/header"],
-  "rules": {
-    "@tony.ganchev/header/header": ["error", "../../header.js"]
-  }
-}

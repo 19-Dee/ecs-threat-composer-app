@@ -1,31 +1,45 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "dom"
-    ],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "checkJs": false,
-    "jsx": "react-jsx",
+    "rootDir": "src",
+    "outDir": "lib",
+    "alwaysStrict": true,
+    "declaration": true,
     "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "module": "commonjs",
+    "noEmitOnError": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "strictPropertyInitialization": true,
+    "stripInternal": true,
+    "target": "es5",
+    "allowJs": true,
+    "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
     "isolatedModules": true,
-    "skipLibCheck": true,
-    "strict": true,
     "noEmit": true,
-    "types": [
-      "node"
-    ]
+    "emitDecoratorMetadata": true,
+    "jsx": "react-jsx"
   },
   "include": [
-    "scripts/**/*.ts"
+    "src/**/*.ts",
+    "src"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": []
 }
