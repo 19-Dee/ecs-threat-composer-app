@@ -62,3 +62,13 @@ output "target_group_arn" {
   description = "ARN of the ALB target group"
   value       = module.alb.target_group_arn
 }
+
+output "app_domain_name" {
+  description = "Public hostname of the ECS application"
+  value       = module.route53.app_domain_name
+}
+
+output "acm_certificate_arn" {
+  description = "ARN of the ACM certificate"
+  value       = module.route53.certificate_arn
+}

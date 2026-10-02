@@ -63,6 +63,7 @@ module "alb" {
   project_name      = var.project_name
   vpc_id            = module.vpc.vpc_id
   public_subnet_ids = module.vpc.public_subnet_ids
+  certificate_arn   = module.route53.certificate_arn
 }
 
 resource "aws_security_group_rule" "ecs_from_alb" {
@@ -73,4 +74,13 @@ resource "aws_security_group_rule" "ecs_from_alb" {
   protocol                 = "tcp"
   security_group_id        = aws_security_group.ecs.id
   source_security_group_id = module.alb.alb_security_group_id
+}
+
+module "route53" {
+  source = "./modules/route53"
+
+  hosted_zone_name = "devopsbydishen.shop"
+  app_domain_name  = "ecs.devopsbydishen.shop"
+  alb_dns_name     = module.alb.alb_dns_name
+  alb_zone_id      = module.alb.alb_zone_id
 }
