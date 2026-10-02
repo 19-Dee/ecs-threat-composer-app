@@ -47,3 +47,18 @@ output "ecs_service_name" {
   description = "Name of the ECS Fargate service"
   value       = module.ecs.service_name
 }
+
+output "alb_dns_name" {
+  description = "DNS name of the application load balancer"
+  value       = module.alb.alb_dns_name
+}
+
+output "alb_security_group_id" {
+  description = "Security group ID of the ALB"
+  value       = module.alb.alb_security_group_id
+}
+
+output "target_group_arn" {
+  description = "ARN of the ALB target group"
+  value       = module.alb.target_group_arn
+}

@@ -49,8 +49,28 @@ module "ecs" {
   task_role_arn      = aws_iam_role.ecs_task.arn
   private_subnet_ids = module.vpc.private_subnet_ids
   security_group_id  = aws_security_group.ecs.id
+  target_group_arn   = module.alb.target_group_arn
 
   depends_on = [
+    module.alb,
     aws_iam_role_policy_attachment.ecs_task_execution
   ]
+}
+
+module "alb" {
+  source = "./modules/alb"
+
+  project_name      = var.project_name
+  vpc_id            = module.vpc.vpc_id
+  public_subnet_ids = module.vpc.public_subnet_ids
+}
+
+resource "aws_security_group_rule" "ecs_from_alb" {
+  type                     = "ingress"
+  description              = "Threat Composer from ALB"
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.ecs.id
+  source_security_group_id = module.alb.alb_security_group_id
 }
