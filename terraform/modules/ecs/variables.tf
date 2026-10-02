@@ -10,10 +10,6 @@ variable "execution_role_arn" {
   type = string
 }
 
-variable "task_role_arn" {
-  type = string
-}
-
 variable "private_subnet_ids" {
   type = list(string)
 }

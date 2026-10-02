@@ -6,13 +6,6 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-resource "aws_ecs_cluster_capacity_providers" "main" {
-  cluster_name = aws_ecs_cluster.main.name
-
-  capacity_providers = ["FARGATE"]
-}
-
-
 resource "aws_cloudwatch_log_group" "main" {
   name              = "/ecs/${var.project_name}"
   retention_in_days = 7
@@ -21,12 +14,10 @@ resource "aws_cloudwatch_log_group" "main" {
 resource "aws_ecs_task_definition" "app" {
   family                   = "${var.project_name}-task"
   execution_role_arn       = var.execution_role_arn
-  task_role_arn            = var.task_role_arn
   network_mode             = "awsvpc"
   requires_compatibilities = ["FARGATE"]
   cpu                      = 1024
   memory                   = 4096
-
   runtime_platform {
     cpu_architecture        = "X86_64"
     operating_system_family = "LINUX"
@@ -35,7 +26,7 @@ resource "aws_ecs_task_definition" "app" {
   container_definitions = jsonencode([
     {
       name      = "threat-composer"
-      image     = "${var.ecr_repository_url}:initial-amd64"
+      image     = "${var.ecr_repository_url}:latest"
       essential = true
 
       portMappings = [
@@ -83,4 +74,5 @@ resource "aws_ecs_service" "app" {
     container_name   = "threat-composer"
     container_port   = 3000
   }
+
 }

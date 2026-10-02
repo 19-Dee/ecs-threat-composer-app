@@ -23,11 +23,6 @@ output "ecs_task_execution_role_arn" {
   value       = aws_iam_role.ecs_task_execution.arn
 }
 
-output "ecs_task_role_arn" {
-  description = "ARN of the ECS application task role"
-  value       = aws_iam_role.ecs_task.arn
-}
-
 output "ecs_cluster_name" {
   description = "Name of the ECS cluster"
   value       = module.ecs.cluster_name
@@ -38,14 +33,9 @@ output "ecs_task_definition_arn" {
   value       = module.ecs.task_definition_arn
 }
 
-output "ecs_security_group_id" {
-  description = "Security group ID of the ECS tasks"
-  value       = aws_security_group.ecs.id
-}
-
-output "ecs_service_name" {
-  description = "Name of the ECS Fargate service"
-  value       = module.ecs.service_name
+output "ecs_log_group_name" {
+  description = "CloudWatch log group used by the ECS task"
+  value       = module.ecs.log_group_name
 }
 
 output "alb_dns_name" {
@@ -58,9 +48,19 @@ output "alb_security_group_id" {
   value       = module.alb.alb_security_group_id
 }
 
+output "ecs_security_group_id" {
+  description = "Security group ID of the ECS tasks"
+  value       = aws_security_group.ecs.id
+}
+
 output "target_group_arn" {
   description = "ARN of the ALB target group"
   value       = module.alb.target_group_arn
+}
+
+output "ecs_service_name" {
+  description = "Name of the ECS Fargate service"
+  value       = module.ecs.service_name
 }
 
 output "app_domain_name" {
@@ -73,7 +73,7 @@ output "acm_certificate_arn" {
   value       = module.route53.certificate_arn
 }
 
-output "ecs_log_group_name" {
-  description = "CloudWatch log group used by the ECS task"
-  value       = module.ecs.log_group_name
+output "github_actions_deploy_role_arn" {
+  description = "Role assumed by the private repository's deployment workflow"
+  value       = aws_iam_role.github_actions_deploy.arn
 }

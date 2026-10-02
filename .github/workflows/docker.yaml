@@ -1,0 +1,40 @@
+name: Pipelines for ECS Project
+
+on:
+  push:
+    paths:
+      - "app/**"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCOUNT_ID: "142969859154"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::142969859154:role/ecs-threat-composer-github-actions-deploy
+          aws-region: eu-west-2
+
+      - name: Log in to Amazon ECR
+        run: |
+          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com
+
+      - name: Build Docker image
+        run: |
+          cd app
+          ECR_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com/ecs-threat-composer-app:latest
+          docker build --platform linux/amd64 -t $ECR_URI .
+          docker push $ECR_URI
+
+      - name: Deploy to Amazon ECS
+        run: |
+          aws ecs update-service --cluster ecs-threat-composer-cluster --service ecs-threat-composer-service --force-new-deployment
