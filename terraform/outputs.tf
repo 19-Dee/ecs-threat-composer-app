@@ -12,3 +12,8 @@ output "private_subnet_ids" {
   description = "Private subnet IDs"
   value       = module.vpc.private_subnet_ids
 }
+
+output "ecr_repository_url" {
+  description = "URL of the Threat Composer ECR repository"
+  value       = aws_ecr_repository.threat_composer.repository_url
+}
