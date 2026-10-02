@@ -13,3 +13,7 @@ output "task_definition_arn" {
 output "service_name" {
   value = aws_ecs_service.app.name
 }
+
+output "log_group_name" {
+  value = aws_cloudwatch_log_group.main.name
+}

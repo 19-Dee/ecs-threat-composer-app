@@ -72,3 +72,8 @@ output "acm_certificate_arn" {
   description = "ARN of the ACM certificate"
   value       = module.route53.certificate_arn
 }
+
+output "ecs_log_group_name" {
+  description = "CloudWatch log group used by the ECS task"
+  value       = module.ecs.log_group_name
+}
