@@ -27,3 +27,23 @@ output "ecs_task_role_arn" {
   description = "ARN of the ECS application task role"
   value       = aws_iam_role.ecs_task.arn
 }
+
+output "ecs_cluster_name" {
+  description = "Name of the ECS cluster"
+  value       = module.ecs.cluster_name
+}
+
+output "ecs_task_definition_arn" {
+  description = "ARN of the ECS task definition"
+  value       = module.ecs.task_definition_arn
+}
+
+output "ecs_security_group_id" {
+  description = "Security group ID of the ECS tasks"
+  value       = aws_security_group.ecs.id
+}
+
+output "ecs_service_name" {
+  description = "Name of the ECS Fargate service"
+  value       = module.ecs.service_name
+}
