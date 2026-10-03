@@ -337,6 +337,9 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     resources = ["arn:aws:route53:::change/*"]
   }
 
+}
+
+data "aws_iam_policy_document" "github_actions_iam" {
   statement {
     sid    = "ManageECSProjectRoles"
     effect = "Allow"
@@ -416,4 +419,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
   name   = "${var.project_name}-deploy"
   role   = aws_iam_role.github_actions_deploy.id
   policy = data.aws_iam_policy_document.github_actions_deploy.json
+}
+
+resource "aws_iam_role_policy" "github_actions_iam" {
+  name   = "${var.project_name}-iam"
+  role   = aws_iam_role.github_actions_deploy.id
+  policy = data.aws_iam_policy_document.github_actions_iam.json
 }
