@@ -1,4 +1,4 @@
-# AWS ECS deployment of Threat Composer
+# Production-style AWS ECS deployment of Threat Composer
 
 A containerised deployment of the Threat Composer application on AWS ECS Fargate using Terraform for infrastructure, GitHub Actions for CI/CD, OIDC for secure AWS authentication, and CloudWatch for application logging.
 
