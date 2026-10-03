@@ -194,10 +194,8 @@ data "aws_iam_policy_document" "github_actions_deploy" {
       "ecs:CreateService",
       "ecs:DeleteCluster",
       "ecs:DeleteService",
-      "ecs:DeregisterTaskDefinition",
       "ecs:DescribeClusters",
       "ecs:DescribeServices",
-      "ecs:DescribeTaskDefinition",
       "ecs:ListTagsForResource",
       "ecs:PutClusterCapacityProviders",
       "ecs:TagResource",
@@ -222,7 +220,9 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     sid    = "DiscoverECSResources"
     effect = "Allow"
     actions = [
+      "ecs:DeregisterTaskDefinition",
       "ecs:DescribeCapacityProviders",
+      "ecs:DescribeTaskDefinition",
       "ecs:ListAccountSettings",
       "ecs:ListClusters",
       "ecs:ListServices",
