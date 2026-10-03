@@ -207,7 +207,7 @@ data "aws_iam_policy_document" "github_actions_deploy" {
     resources = [
       "arn:aws:ecs:eu-west-2:142969859154:cluster/ecs-threat-composer-cluster",
       "arn:aws:ecs:eu-west-2:142969859154:service/ecs-threat-composer-cluster/ecs-threat-composer-service",
-      "arn:aws:ecs:eu-west-2:142969859154:task-definition/ecs-threat-composer:*"
+      "arn:aws:ecs:eu-west-2:142969859154:task-definition/ecs-threat-composer-task:*"
     ]
   }
 
