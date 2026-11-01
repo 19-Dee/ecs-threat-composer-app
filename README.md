@@ -18,13 +18,17 @@ The application runs in private subnets behind an Application Load Balancer with
 - **Observability:** CloudWatch Logs
 - **Containerisation:** Docker
 
+
 ## Live Application
+
 
 <img width="2542" height="1364" alt="Screenshot 2026-10-03 at 02 11 57" src="https://github.com/user-attachments/assets/17b322c8-f0c6-4497-8663-ee59adc2fbde" />
 
+
 ## Architecture
 
-<img width="2048" height="1345" alt="Threat Composer on AWS ECS Fargate Architecture (10)" src="https://github.com/user-attachments/assets/96274d2e-08bf-44bc-8a99-05cc97f5123e" />
+
+![AWS ECS Fargate architecture for Threat Composer](ecs-threat-composer-architecture.svg)
 
 ## CI/CD
 
