@@ -63,6 +63,11 @@ resource "aws_ecs_service" "app" {
 
   health_check_grace_period_seconds = 300
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   network_configuration {
     subnets          = var.private_subnet_ids
     security_groups  = [var.security_group_id]

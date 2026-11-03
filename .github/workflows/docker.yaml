@@ -1,40 +1,260 @@
-name: Pipelines for ECS Project
+name: Application CI and ECS Deployment
 
 on:
-  push:
+  pull_request:
+    branches: [main]
     paths:
       - "app/**"
+      - ".github/workflows/docker.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/docker.yaml"
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional existing ECR SHA tag to redeploy or roll back to
+        required: false
+        default: ""
+        type: string
+
+concurrency:
+  group: ecs-application-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  id-token: write
+
+env:
+  AWS_ACCOUNT_ID: "142969859154"
+  AWS_REGION: eu-west-2
+  ECR_REPOSITORY: ecs-threat-composer-app
+  ECS_CLUSTER: ecs-threat-composer-cluster
+  ECS_SERVICE: ecs-threat-composer-service
+  ECS_TASK_FAMILY: ecs-threat-composer-task
+  CONTAINER_NAME: threat-composer
 
 jobs:
-  deploy:
+  verify:
+    name: Test, build, scan and smoke test
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCOUNT_ID: "142969859154"
+    timeout-minutes: 30
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: yarn
+          cache-dependency-path: app/yarn.lock
+
+      - name: Install dependencies
+        working-directory: app
+        run: yarn install --frozen-lockfile
+
+      - name: Run application tests
+        working-directory: app
+        env:
+          CI: "true"
+        run: yarn test --watchAll=false --runInBand
+
+      - name: Build production application
+        working-directory: app
+        run: yarn build
+
+      - name: Build container image
+        run: docker build --platform linux/amd64 -t "threat-composer:${GITHUB_SHA}" ./app
+
+      - name: Gate fixable high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: threat-composer:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+      - name: Smoke test production container
+        run: |
+          docker run --rm -d --name threat-composer-smoke -p 3000:3000 "threat-composer:${GITHUB_SHA}"
+          trap 'docker stop threat-composer-smoke >/dev/null 2>&1 || true' EXIT
+
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/healthz >/dev/null; then
+              break
+            fi
+            if [ "${attempt}" -eq 30 ]; then
+              docker logs threat-composer-smoke
+              exit 1
+            fi
+            sleep 2
+          done
+
+          curl --fail --silent http://127.0.0.1:3000/ | grep -q '<title>threat-composer</title>'
+          curl --fail --silent http://127.0.0.1:3000/workspaces/example | grep -q '<title>threat-composer</title>'
+
+  deploy:
+    name: Publish and verify ECS deployment
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::142969859154:role/ecs-threat-composer-github-actions-deploy
-          aws-region: eu-west-2
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
-        run: |
-          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
+      - name: Select immutable image
+        id: image
         run: |
-          cd app
-          ECR_URI=${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.eu-west-2.amazonaws.com/ecs-threat-composer-app:latest
-          docker build --platform linux/amd64 -t $ECR_URI .
-          docker push $ECR_URI
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          BUILD_IMAGE=false
+          if [ -z "${IMAGE_TAG}" ]; then
+            IMAGE_TAG="${GITHUB_SHA}"
+            BUILD_IMAGE=true
+          fi
 
-      - name: Deploy to Amazon ECS
+          ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          echo "IMAGE_TAG=${IMAGE_TAG}" >> "${GITHUB_ENV}"
+          echo "ECR_URI=${ECR_URI}" >> "${GITHUB_ENV}"
+          echo "uri=${ECR_URI}" >> "${GITHUB_OUTPUT}"
+          echo "build_image=${BUILD_IMAGE}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build immutable image
+        if: steps.image.outputs.build_image == 'true'
+        run: docker build --platform linux/amd64 -t "${ECR_URI}" ./app
+
+      - name: Gate fixable high and critical vulnerabilities
+        if: steps.image.outputs.build_image == 'true'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ steps.image.outputs.uri }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+
+      - name: Push immutable image
+        if: steps.image.outputs.build_image == 'true'
+        run: docker push "${ECR_URI}"
+
+      - name: Confirm rollback image exists
+        if: steps.image.outputs.build_image == 'false'
         run: |
-          aws ecs update-service --cluster ecs-threat-composer-cluster --service ecs-threat-composer-service --force-new-deployment
+          aws ecr describe-images \
+            --repository-name "${ECR_REPOSITORY}" \
+            --image-ids imageTag="${IMAGE_TAG}" \
+            >/dev/null
+
+      - name: Register task definition revision
+        run: |
+          PREVIOUS_TASK_DEFINITION="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].taskDefinition' \
+            --output text)"
+          echo "PREVIOUS_TASK_DEFINITION=${PREVIOUS_TASK_DEFINITION}" >> "${GITHUB_ENV}"
+
+          aws ecs describe-task-definition \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --query taskDefinition \
+            > current-task-definition.json
+
+          jq --arg image "${ECR_URI}" --arg container "${CONTAINER_NAME}" '
+            .containerDefinitions |= map(if .name == $container then .image = $image else . end)
+            | del(
+                .taskDefinitionArn,
+                .revision,
+                .status,
+                .requiresAttributes,
+                .compatibilities,
+                .registeredAt,
+                .registeredBy,
+                .deregisteredAt
+              )
+          ' current-task-definition.json > new-task-definition.json
+
+          NEW_TASK_DEFINITION="$(aws ecs register-task-definition \
+            --cli-input-json file://new-task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+          echo "NEW_TASK_DEFINITION=${NEW_TASK_DEFINITION}" >> "${GITHUB_ENV}"
+
+      - name: Deploy and wait for service stability
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${NEW_TASK_DEFINITION}" \
+            >/dev/null
+
+          if ! aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"; then
+            echo "Deployment did not stabilise; restoring ${PREVIOUS_TASK_DEFINITION}." >&2
+            aws ecs update-service \
+              --cluster "${ECS_CLUSTER}" \
+              --service "${ECS_SERVICE}" \
+              --task-definition "${PREVIOUS_TASK_DEFINITION}" \
+              >/dev/null
+            aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+            exit 1
+          fi
+
+      - name: Verify deployed image and target health
+        run: |
+          DEPLOYED_TASK_DEFINITION="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].taskDefinition' \
+            --output text)"
+
+          DEPLOYED_IMAGE="$(aws ecs describe-task-definition \
+            --task-definition "${DEPLOYED_TASK_DEFINITION}" \
+            --query "taskDefinition.containerDefinitions[?name=='${CONTAINER_NAME}'].image | [0]" \
+            --output text)"
+
+          if [ "${DEPLOYED_IMAGE}" != "${ECR_URI}" ]; then
+            echo "Expected ${ECR_URI}, but ECS uses ${DEPLOYED_IMAGE}." >&2
+            exit 1
+          fi
+
+          TARGET_GROUP_ARN="$(aws ecs describe-services \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}" \
+            --query 'services[0].loadBalancers[0].targetGroupArn' \
+            --output text)"
+
+          UNHEALTHY_TARGETS="$(aws elbv2 describe-target-health \
+            --target-group-arn "${TARGET_GROUP_ARN}" \
+            --query "length(TargetHealthDescriptions[?TargetHealth.State!='healthy'])" \
+            --output text)"
+
+          if [ "${UNHEALTHY_TARGETS}" != "0" ]; then
+            aws elbv2 describe-target-health --target-group-arn "${TARGET_GROUP_ARN}"
+            exit 1
+          fi
+
+          {
+            echo "## ECS deployment verified"
+            echo ""
+            echo "- Image: \`${DEPLOYED_IMAGE}\`"
+            echo "- Service: \`${ECS_SERVICE}\` reached a stable state"
+            echo "- ALB targets: healthy"
+          } >> "${GITHUB_STEP_SUMMARY}"
