@@ -105,9 +105,9 @@ Register New Task Definition Revision
 Wait for ECS Service Stability and Healthy ALB Targets
 ```
 
-Pull requests run tests, compile the application, build the container, scan it, and exercise `/healthz`, the homepage, and a client-side route without AWS access. On `main`, the same image is tagged with the Git commit SHA and deployed through a new ECS task-definition revision.
+Pull requests and pushes to `main` run tests, compile the application, build the container, scan it, and exercise `/healthz`, the homepage, and a client-side route without AWS access. Deployment is deliberately manual: running the workflow against `main` with no image tag builds and publishes the current commit SHA, then deploys it through a new ECS task-definition revision.
 
-If the service does not stabilise, the workflow restores the previous task definition and fails. A manual workflow run accepts an existing ECR SHA tag, providing an explicit rollback path without rebuilding the image.
+If the service does not stabilise, the workflow restores the previous task definition and fails. Supplying an existing ECR SHA tag during the manual run provides an explicit redeployment or rollback path without rebuilding the image.
 
 ### Container Image
 
@@ -229,13 +229,13 @@ The GitHub Actions Docker workflow builds the application for:
 linux/amd64
 ```
 
-and pushes the image to Amazon ECR.
+and, only during a manually approved deployment with no existing tag supplied, pushes the SHA-tagged image to Amazon ECR.
 
 ### 7. Deploy to ECS
 
 The pipeline registers a task-definition revision that references the immutable SHA-tagged image, updates the service, waits for ECS stability, checks the deployed image, and confirms that the ALB targets are healthy.
 
-To roll back, manually run the same workflow with a previously published ECR image tag. The workflow verifies that the tag exists before registering and deploying the rollback revision.
+To release the current commit, manually run the workflow against `main` and leave the image-tag input blank. To roll back, supply a previously published ECR SHA tag instead. The workflow verifies that an explicitly supplied tag exists before registering and deploying the rollback revision.
 
 ## Decisions and Trade-offs
 

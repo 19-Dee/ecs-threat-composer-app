@@ -14,8 +14,9 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Existing ECR image tag to redeploy or roll back to
-        required: true
+        description: Optional existing ECR SHA tag to redeploy or roll back to
+        required: false
+        default: ""
         type: string
 
 concurrency:
@@ -99,7 +100,7 @@ jobs:
 
   deploy:
     name: Publish and verify ECS deployment
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -122,23 +123,25 @@ jobs:
       - name: Select immutable image
         id: image
         run: |
-          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
-            IMAGE_TAG="${{ inputs.image_tag }}"
-          else
+          IMAGE_TAG="${{ inputs.image_tag }}"
+          BUILD_IMAGE=false
+          if [ -z "${IMAGE_TAG}" ]; then
             IMAGE_TAG="${GITHUB_SHA}"
+            BUILD_IMAGE=true
           fi
 
           ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${IMAGE_TAG}"
           echo "IMAGE_TAG=${IMAGE_TAG}" >> "${GITHUB_ENV}"
           echo "ECR_URI=${ECR_URI}" >> "${GITHUB_ENV}"
           echo "uri=${ECR_URI}" >> "${GITHUB_OUTPUT}"
+          echo "build_image=${BUILD_IMAGE}" >> "${GITHUB_OUTPUT}"
 
       - name: Build immutable image
-        if: github.event_name == 'push'
+        if: steps.image.outputs.build_image == 'true'
         run: docker build --platform linux/amd64 -t "${ECR_URI}" ./app
 
       - name: Gate fixable high and critical vulnerabilities
-        if: github.event_name == 'push'
+        if: steps.image.outputs.build_image == 'true'
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ steps.image.outputs.uri }}
@@ -150,11 +153,11 @@ jobs:
           severity: HIGH,CRITICAL
 
       - name: Push immutable image
-        if: github.event_name == 'push'
+        if: steps.image.outputs.build_image == 'true'
         run: docker push "${ECR_URI}"
 
       - name: Confirm rollback image exists
-        if: github.event_name == 'workflow_dispatch'
+        if: steps.image.outputs.build_image == 'false'
         run: |
           aws ecr describe-images \
             --repository-name "${ECR_REPOSITORY}" \
