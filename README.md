@@ -17,6 +17,7 @@ The application runs in private subnets behind an Application Load Balancer with
 - **Authentication:** GitHub OIDC → AWS IAM
 - **Observability:** CloudWatch Logs
 - **Containerisation:** Docker
+- **Security:** Trivy vulnerability gating, non-root runtime
 
 
 ## Live Application
@@ -89,17 +90,38 @@ Application Change
 GitHub Actions
       |
       v
-Build linux/amd64 Image
+Tests + Production Build + Container Smoke Test
       |
       v
-Push :latest to ECR
+Trivy HIGH/CRITICAL Gate
       |
       v
-Force ECS Service Deployment
+Push Commit-SHA Image to ECR
       |
       v
-New Fargate Task
+Register New Task Definition Revision
+      |
+      v
+Wait for ECS Service Stability and Healthy ALB Targets
 ```
+
+Pull requests run tests, compile the application, build the container, scan it, and exercise `/healthz`, the homepage, and a client-side route without AWS access. On `main`, the same image is tagged with the Git commit SHA and deployed through a new ECS task-definition revision.
+
+If the service does not stabilise, the workflow restores the previous task definition and fails. A manual workflow run accepts an existing ECR SHA tag, providing an explicit rollback path without rebuilding the image.
+
+### Container Image
+
+The Docker build compiles Threat Composer and copies only the static output into an unprivileged NGINX runtime. It no longer ships the source tree, development dependencies, or React development server.
+
+Local `linux/amd64` builds on 3 November 2026 measured:
+
+| Image | Size |
+|---|---:|
+| Previous Node development-server runtime | 224,558,701 bytes (214.16 MiB) |
+| Patched NGINX static runtime | 30,840,964 bytes (29.41 MiB) |
+| Reduction | 86.3% |
+
+The optimized image returned `200` from `/healthz`, served the homepage and a client-side route, and ran as non-root user `101`. A local Trivy 0.70.0 scan found zero fixable `HIGH` or `CRITICAL` OS/library vulnerabilities at scan time. These are local Docker measurements, not ECR transfer size or live ECS performance results.
 
 The ECS task definition runs:
 
@@ -211,9 +233,9 @@ and pushes the image to Amazon ECR.
 
 ### 7. Deploy to ECS
 
-The pipeline forces a new ECS service deployment after the image is pushed.
+The pipeline registers a task-definition revision that references the immutable SHA-tagged image, updates the service, waits for ECS stability, checks the deployed image, and confirms that the ALB targets are healthy.
 
-The Fargate task is then registered automatically with the ALB target group.
+To roll back, manually run the same workflow with a previously published ECR image tag. The workflow verifies that the tag exists before registering and deploying the rollback revision.
 
 ## Decisions and Trade-offs
 
@@ -243,13 +265,11 @@ Terraform planning is automated while infrastructure application is manually tri
 
 This separates infrastructure review from infrastructure modification and avoids automatically applying every Terraform change.
 
-### Mutable `latest` Image Tag
+### Immutable SHA Image Tags
 
-The application deployment workflow pushes the `latest` image tag to ECR and forces a new ECS deployment.
+Each application image is tagged with the source commit SHA. The workflow records that exact image in a new task-definition revision, verifies it after the service stabilises, and can redeploy an older SHA tag for rollback.
 
-This keeps the deployment mechanism intentionally simple for the scope of the project.
-
-A production system could instead deploy immutable image digests or versioned tags.
+Terraform still defines the baseline task definition used when infrastructure is first created. Application releases create later revisions through CI so normal code delivery does not reapply the full infrastructure stack.
 
 ### Single NAT Gateway
 
@@ -299,7 +319,7 @@ Moving them to the wildcard-scoped discovery statement resolved the problem.
 
 ### Missing ECR Image
 
-After the infrastructure was first deployed, ECS attempted to start the task before an image tagged `latest` existed in ECR.
+During the original deployment, ECS attempted to start the baseline task definition before an image tagged `latest` existed in ECR.
 
 The task failed with:
 
@@ -307,7 +327,7 @@ The task failed with:
 CannotPullContainerError
 ```
 
-The Docker workflow then:
+The original Docker workflow then:
 
 ```text
 Built Image
@@ -322,6 +342,8 @@ Forced ECS Deployment
 Task Started Successfully
 ```
 
+The current delivery workflow avoids relying on a mutable tag for releases: it verifies or publishes a commit-SHA tag and registers that exact image in a new task-definition revision.
+
 ### ALB Health Check Timing
 
 The target initially reported:
@@ -330,7 +352,7 @@ The target initially reported:
 Target.Timeout
 ```
 
-CloudWatch showed that the React development server was still compiling.
+CloudWatch showed that the original React development server was still compiling.
 
 Once compilation completed, the application responded successfully and the target transitioned to:
 
@@ -340,9 +362,11 @@ healthy
 
 No infrastructure change was required.
 
+The current image compiles the application during the build and serves static files through NGINX, so that development-server startup delay is no longer part of the runtime design. This has been verified locally but not yet retested in a live ECS service.
+
 ## Validation
 
-The completed deployment was validated through:
+The original live deployment was validated through:
 
 - successful Terraform GitHub Actions workflow
 - successful Docker deployment workflow
@@ -357,6 +381,16 @@ The completed deployment was validated through:
 ```text
 HTTP 200 | total ~0.14s
 ```
+
+For the current revision, local verification confirms:
+
+- 13 application test suites (25 tests), including the new Save-button behavior checks, pass
+- the optimized `linux/amd64` image builds successfully
+- `/healthz`, `/`, and a client-side route return successfully
+- the container health check reports `healthy`
+- the runtime uses non-root user `101`
+
+The infrastructure remains destroyed to avoid AWS charges. The new SHA-tag deployment, automatic failed-deployment restoration, ECS stability wait and ALB target-health check are configured in CI but have not yet been executed against a live service.
 
 ## Evidence
 
